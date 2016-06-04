@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<phpunit
+        bootstrap="bootstrap.php"
+        colors="true"
+        verbose="true"
+        backupGlobals="false"
+        syntaxCheck="true"
+        >
+    <testsuites>
+        <testsuite name="Binary symlink Unit Test Suite">
+            <directory>./src</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

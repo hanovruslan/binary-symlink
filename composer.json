@@ -1,0 +1,32 @@
+{
+    "name": "evolaze/binary-symlink",
+    "license": "MIT",
+    "type": "library",
+    "description": "Binary symlink script handler",
+    "authors": [{
+            "name": "Hanov Ruslan",
+            "email": "hanov.ruslan@gmail.com",
+            "role": "Developer"
+    }],
+    "autoload": {
+        "psr-4": {
+            "Evolaze\\BinarySymlink\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Evolaze\\BinarySymlink\\Test\\": "tests/src/"
+        }
+    },
+    "require": {
+        "php": ">=5.6.1",
+        "sensio/distribution-bundle": "~3.0|~5.0"
+    },
+    "require-dev": {
+        "composer/composer": "1.0.0-alpha10",
+        "phpunit/phpunit": "~5.2.1"
+    },
+    "config": {
+        "bin-dir": "bin"
+    }
+}
