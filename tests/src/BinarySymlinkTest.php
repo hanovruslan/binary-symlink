@@ -90,7 +90,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param array|null $selfExtra
      * @dataProvider dataExtra
      */
-    public function testInstall($expected, $selfExtra)
+    public function testInstall(string $expected, array $selfExtra = null)
     {
         $this->package->setExtra($this->buildExtra($selfExtra));
         $event = new CommandEvent('name', $this->composer, $this->io, true);
@@ -137,7 +137,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param string $to
      * @dataProvider dataScanDir
      */
-    public function testScanDir($expected, array $selfExtra, $to)
+    public function testScanDir(int $expected, array $selfExtra, string $to)
     {
         $this->package->setExtra($this->buildExtra($selfExtra));
         $event = new CommandEvent('name', $this->composer, $this->io, true);
@@ -165,11 +165,15 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     /**
      * @param array|null $selfExtra
      * @return array
+     *
+     * Have to define some items from \Sensio\Bundle\DistributionBundle\Composer\ScriptHandler::$options
+     * in order to avoid 'Undefined index' errors
      */
-    protected function buildExtra($selfExtra)
+    protected function buildExtra(array $selfExtra = null)
     {
         return [
             'symfony-assets-install' => 'relative',
+            'symfony-cache-warmup' => false,
             'evolaze-binary-symlink' => $selfExtra,
         ];
     }
