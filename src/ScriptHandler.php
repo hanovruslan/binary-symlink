@@ -119,9 +119,9 @@ class ScriptHandler extends BaseScriptHandler
     /**
      * @param array $options
      * @param string $name
-     * @return mixed mixed
+     * @return mixed
      */
-    protected static function extractOption(array $options, $name)
+    protected static function extractOption(array $options, string $name)
     {
         return isset($options[$name])
             ? $options[$name]
@@ -135,7 +135,7 @@ class ScriptHandler extends BaseScriptHandler
      *
      * @return null | array
      */
-    protected static function extractLinks(array $options, $toDir, $fromDir)
+    protected static function extractLinks(array $options, string $toDir, string $fromDir)
     {
         return isset($options[self::NAME_LINKS])
             && is_array($options[self::NAME_LINKS])
@@ -150,7 +150,7 @@ class ScriptHandler extends BaseScriptHandler
      *
      * @return array
      */
-    protected static function buildLinks(array $links, $toDir, $fromDir)
+    protected static function buildLinks(array $links, string $toDir, string $fromDir)
     {
         $result = [];
         $filesystem = self::getFilesystem();
@@ -180,7 +180,7 @@ class ScriptHandler extends BaseScriptHandler
      *
      * @return string
      */
-    static protected function buildLinkTo(array $link, $toDir)
+    static protected function buildLinkTo(array $link, string $toDir)
     {
         $to = $toDir . DIRECTORY_SEPARATOR;
         $to .= isset($link[self::NAME_TO])
@@ -196,7 +196,7 @@ class ScriptHandler extends BaseScriptHandler
      *
      * @return array
      */
-    static protected function buildLinkFrom(array $link, $fromDir)
+    static protected function buildLinkFrom(array $link, string $fromDir)
     {
         if (is_dir($fromDir . DIRECTORY_SEPARATOR . $link[self::NAME_FROM])) {
             $from = self::scanSubdir($fromDir, $link[self::NAME_FROM]);
@@ -214,7 +214,7 @@ class ScriptHandler extends BaseScriptHandler
      * @param string $subdir
      * @return array
      */
-    static protected function scanSubdir($dir, $subdir)
+    static protected function scanSubdir(string $dir, string $subdir)
     {
         $result = [];
         /** @var \Symfony\Component\Finder\SplFileInfo $file */

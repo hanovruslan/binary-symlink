@@ -75,14 +75,11 @@ Also specify only dir in links and ScriptHandler will scan it and will create li
 ```
 
 ```
-composer require evolaze/binary-symlink:~1.0.0 (or dev-master)
+composer require evolaze/binary-symlink:^2.0.0
 ```
 
 ## Tests ##
 
-- ``` ./bin/phpunit -c ./tests/phpunit.xml ```
-
-## TODO ##
-
-* add filemode customization (to make it available for shell auto completion)
-* add ability to create links from multiple from-dir
+```
+./bin/phpunit -c ./tests/phpunit.xml
+```
