@@ -11,6 +11,11 @@ with extra config section and post install or\and update trigger
 
 ## Installation ##
 
+ 
+```
+composer require evolaze/binary-symlink
+```
+
 In order to add link from **app/from.sh** to **bin/to.sh**
 
 ### Composer.json ###
@@ -74,12 +79,7 @@ Also specify only dir in links and ScriptHandler will scan it and will create li
 
 ```
 
-```
-composer require evolaze/binary-symlink:^2.0.0
-```
 
 ## Tests ##
 
-```
-./bin/phpunit -c ./tests/phpunit.xml
-```
+`./bin/phpunit -c ./tests/phpunit.xml` or `./app/composer.sh run-script test` for testing in docker
