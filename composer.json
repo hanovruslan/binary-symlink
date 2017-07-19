@@ -4,9 +4,9 @@
     "type": "library",
     "description": "Binary symlink script handler",
     "authors": [{
-            "name": "Hanov Ruslan",
-            "email": "hanov.ruslan@gmail.com",
-            "role": "Developer"
+        "name": "Hanov Ruslan",
+        "email": "hanov.ruslan@gmail.com",
+        "role": "Developer"
     }],
     "autoload": {
         "psr-4": {

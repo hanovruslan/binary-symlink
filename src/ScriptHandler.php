@@ -10,14 +10,13 @@ use Symfony\Component\Finder\Finder;
 
 class ScriptHandler extends BaseScriptHandler
 {
-    const NAME_SELF = 'evolaze-binary-symlink';
-    const NAME_FROM_DIR = 'from-dir';
-    const NAME_TO_DIR = 'to-dir';
-    const NAME_FROM = 'from';
-    const NAME_TO = 'to';
-    const NAME_LINKS = 'links';
-
-    protected static $DEFAULTS = [
+    protected const NAME_SELF = 'evolaze-binary-symlink';
+    protected const NAME_FROM_DIR = 'from-dir';
+    protected const NAME_TO_DIR = 'to-dir';
+    protected const NAME_FROM = 'from';
+    protected const NAME_TO = 'to';
+    protected const NAME_LINKS = 'links';
+    protected const DEFAULTS = [
         self::NAME_FROM_DIR => 'app',
         self::NAME_TO_DIR => 'bin',
     ];
@@ -70,7 +69,7 @@ class ScriptHandler extends BaseScriptHandler
     /**
      * @return Finder
      */
-    static protected function getFinder()
+    protected static function getFinder()
     {
         if (!isset(self::$finder)) {
             self::$finder = Finder::create();
@@ -90,7 +89,7 @@ class ScriptHandler extends BaseScriptHandler
     {
         $result = self::extractOptions($options);
         if (!isset($result[self::NAME_LINKS])) {
-            throw new RuntimeException('cannot find binary symlinks');
+            throw new RuntimeException('cannot find links options');
         }
 
         return $result;
@@ -125,7 +124,7 @@ class ScriptHandler extends BaseScriptHandler
     {
         return isset($options[$name])
             ? $options[$name]
-            : self::$DEFAULTS[$name];
+            : self::DEFAULTS[$name];
     }
 
     /**
@@ -154,18 +153,18 @@ class ScriptHandler extends BaseScriptHandler
     {
         $result = [];
         $filesystem = self::getFilesystem();
-        foreach ($links as $key => $link) {
-            $link = !is_array($link)
-                ? [self::NAME_FROM => $link]
-                : $link;
-            $from = self::buildLinkFrom($link, $fromDir);
-            foreach ($from as $_from) {
-                $_link = $link;
-                $_link[self::NAME_FROM] = $_from;
-                $to = self::buildLinkTo($_link, $toDir);
-                $_from = $filesystem->makePathRelative($fromDir, dirname($to)) . $_from;
+        foreach ($links as $rawFrom => $rawTo) {
+            $rawLink = is_array($rawTo) ? $rawTo : [
+                self::NAME_FROM => !is_int($rawFrom) ? $rawFrom : $rawTo,
+                self::NAME_TO => $rawTo,
+            ];
+            foreach (self::resolveLinkFrom($rawLink, $fromDir) as $from) {
+                $link = $rawLink;
+                $link[self::NAME_FROM] = $from;
+                $to = self::resolveLinkTo($link, $toDir, $fromDir);
+                $from = $filesystem->makePathRelative($fromDir, dirname($to)) . $from;
                 $result[] = [
-                    self::NAME_FROM => $_from,
+                    self::NAME_FROM => $from,
                     self::NAME_TO => $to,
                 ];
             }
@@ -177,13 +176,14 @@ class ScriptHandler extends BaseScriptHandler
     /**
      * @param array $link
      * @param string $toDir
+     * @param string $fromDir
      *
      * @return string
      */
-    static protected function buildLinkTo(array $link, string $toDir)
+    protected static function resolveLinkTo(array $link, string $toDir, string $fromDir)
     {
         $to = $toDir . DIRECTORY_SEPARATOR;
-        $to .= isset($link[self::NAME_TO])
+        $to .= isset($link[self::NAME_TO]) && !is_dir($fromDir . DIRECTORY_SEPARATOR . $link[self::NAME_TO])
             ? $link[self::NAME_TO]
             : basename($link[self::NAME_FROM]);
 
@@ -196,7 +196,7 @@ class ScriptHandler extends BaseScriptHandler
      *
      * @return array
      */
-    static protected function buildLinkFrom(array $link, string $fromDir)
+    protected static function resolveLinkFrom(array $link, string $fromDir)
     {
         if (is_dir($fromDir . DIRECTORY_SEPARATOR . $link[self::NAME_FROM])) {
             $from = self::scanSubdir($fromDir, $link[self::NAME_FROM]);
@@ -214,7 +214,7 @@ class ScriptHandler extends BaseScriptHandler
      * @param string $subdir
      * @return array
      */
-    static protected function scanSubdir(string $dir, string $subdir)
+    protected static function scanSubdir(string $dir, string $subdir)
     {
         $result = [];
         /** @var \Symfony\Component\Finder\SplFileInfo $file */
