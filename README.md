@@ -43,43 +43,13 @@ In order to add link from **app/from.sh** to **bin/to.sh**
 * Default dir to create links from is **app**
 * Default dir to create links to is **bin**
 
-**links** section can be reduced down to
-
-```
-            "links": [
-                "from_1",
-                "from_2"
-            ]
-
-```
-
-if there is no requirement for link name
-
-Source and target dir for links configured with
-
-```
-    "extra": {
-        "evolaze-binary-symlink": {
-            "from-dir": "app",
-            "to-dir": "bin",
-        }
-    }
-```
-
-Also specify only dir in links and ScriptHandler will scan it and will create links for all of the files in this dir
-
-```
-    "extra": {
-        "evolaze-binary-symlink": {
-            "links": [
-                "subdir"
-            ]
-        }
-    }
-
-```
-
+See other [examples](resources/docs) and [tests](tests/src/BinarySymlinkTest.php)
 
 ## Tests ##
 
-`./bin/phpunit -c ./tests/phpunit.xml` or `./app/composer.sh run-script test` for testing in docker
+
+`./bin/phpunit -c ./tests/phpunit.xml` - php 7.1+ must be installed
+ 
+or
+ 
+`./app/composer.sh run-script test`  - docker must be installed

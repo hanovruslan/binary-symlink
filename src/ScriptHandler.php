@@ -3,9 +3,9 @@
 namespace Evolaze\BinarySymlink;
 
 use Composer\Script\Event;
+use RuntimeException;
 use Sensio\Bundle\DistributionBundle\Composer\ScriptHandler as BaseScriptHandler;
 use Symfony\Component\Filesystem\Filesystem;
-use RuntimeException;
 use Symfony\Component\Finder\Finder;
 
 class ScriptHandler extends BaseScriptHandler
@@ -76,10 +76,11 @@ class ScriptHandler extends BaseScriptHandler
 
     /**
      * @return Finder
+     * @TODO fix inner cache of founded items
      */
     protected static function getFinder()
     {
-        if (!isset(self::$finder)) {
+        if (true || !isset(self::$finder)) {
             self::$finder = Finder::create();
         }
 
@@ -143,14 +144,19 @@ class ScriptHandler extends BaseScriptHandler
      * @param string $fromDir
      * @param string|null $filemode
      *
-     * @return null | array
+     * @return array|null
      */
     protected static function extractLinks(array $options, string $toDir, string $fromDir, string $filemode = null)
     {
-        return isset($options[self::NAME_LINKS])
-            && is_array($options[self::NAME_LINKS])
-            ? self::resolveLinks($options[self::NAME_LINKS], $toDir, $fromDir, $filemode)
-            : null;
+        $result = null;
+        if (isset($options[self::NAME_LINKS])) {
+            $options[self::NAME_LINKS] = is_array($options[self::NAME_LINKS])
+                ? $options[self::NAME_LINKS]
+                : [$options[self::NAME_LINKS]];
+            $result = self::resolveLinks($options[self::NAME_LINKS], $toDir, $fromDir, $filemode);
+        }
+
+        return $result;
     }
 
     /**
