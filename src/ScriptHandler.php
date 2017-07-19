@@ -16,9 +16,11 @@ class ScriptHandler extends BaseScriptHandler
     protected const NAME_FROM = 'from';
     protected const NAME_TO = 'to';
     protected const NAME_LINKS = 'links';
+    protected const NAME_FILEMODE = 'filemode';
     protected const DEFAULTS = [
         self::NAME_FROM_DIR => 'app',
         self::NAME_TO_DIR => 'bin',
+        self::NAME_FILEMODE => null,
     ];
 
     /** @var Filesystem */
@@ -38,7 +40,7 @@ class ScriptHandler extends BaseScriptHandler
     public static function installBinary(Event $event)
     {
         if ($event->isDevMode()) {
-            $options = self::buildOptions(self::getOptions($event));
+            $options = self::resolveOptions(self::getOptions($event));
             self::processOptions($options);
         }
     }
@@ -49,6 +51,12 @@ class ScriptHandler extends BaseScriptHandler
     protected static function processOptions(array $options)
     {
         foreach ($options[self::NAME_LINKS] as $link) {
+            if (null !== $link[self::NAME_FILEMODE]) {
+                self::getFilesystem()->chmod(
+                    realpath(getcwd() . DIRECTORY_SEPARATOR . dirname($link[self::NAME_TO]) . DIRECTORY_SEPARATOR . $link[self::NAME_FROM]),
+                    intval($link[self::NAME_FILEMODE], 8)
+                );
+            }
             self::getFilesystem()
                 ->symlink($link[self::NAME_FROM], $link[self::NAME_TO]);
         }
@@ -85,9 +93,9 @@ class ScriptHandler extends BaseScriptHandler
      *
      * @throws RuntimeException in case of missed extra options
      */
-    protected static function buildOptions(array $options)
+    protected static function resolveOptions(array $options)
     {
-        $result = self::extractOptions($options);
+        $result = self::_resolveOptions($options);
         if (!isset($result[self::NAME_LINKS])) {
             throw new RuntimeException('cannot find links options');
         }
@@ -99,16 +107,18 @@ class ScriptHandler extends BaseScriptHandler
      * @param array $options
      * @return array|null
      */
-    protected static function extractOptions(array $options)
+    protected static function _resolveOptions(array $options)
     {
         $result = [];
         if (isset($options[self::NAME_SELF]) && is_array($options[self::NAME_SELF])) {
             $result[self::NAME_FROM_DIR] = self::extractOption($options[self::NAME_SELF], self::NAME_FROM_DIR);
             $result[self::NAME_TO_DIR] = self::extractOption($options[self::NAME_SELF], self::NAME_TO_DIR);
+            $result[self::NAME_FILEMODE] = self::extractOption($options[self::NAME_SELF], self::NAME_FILEMODE);
             $result[self::NAME_LINKS] = self::extractLinks(
                 $options[self::NAME_SELF],
                 $result[self::NAME_TO_DIR],
-                $result[self::NAME_FROM_DIR]
+                $result[self::NAME_FROM_DIR],
+                $result[self::NAME_FILEMODE]
             );
         }
 
@@ -131,14 +141,15 @@ class ScriptHandler extends BaseScriptHandler
      * @param array $options
      * @param string $toDir
      * @param string $fromDir
+     * @param string|null $filemode
      *
      * @return null | array
      */
-    protected static function extractLinks(array $options, string $toDir, string $fromDir)
+    protected static function extractLinks(array $options, string $toDir, string $fromDir, string $filemode = null)
     {
         return isset($options[self::NAME_LINKS])
             && is_array($options[self::NAME_LINKS])
-            ? self::buildLinks($options[self::NAME_LINKS], $toDir, $fromDir)
+            ? self::resolveLinks($options[self::NAME_LINKS], $toDir, $fromDir, $filemode)
             : null;
     }
 
@@ -146,10 +157,11 @@ class ScriptHandler extends BaseScriptHandler
      * @param array $links
      * @param string $toDir
      * @param string $fromDir
+     * @param string|null $filemode
      *
      * @return array
      */
-    protected static function buildLinks(array $links, string $toDir, string $fromDir)
+    protected static function resolveLinks(array $links, string $toDir, string $fromDir, string $filemode = null)
     {
         $result = [];
         $filesystem = self::getFilesystem();
@@ -166,6 +178,7 @@ class ScriptHandler extends BaseScriptHandler
                 $result[] = [
                     self::NAME_FROM => $from,
                     self::NAME_TO => $to,
+                    self::NAME_FILEMODE => isset($rawTo[self::NAME_FILEMODE]) ? $rawTo[self::NAME_FILEMODE] : $filemode,
                 ];
             }
         }
