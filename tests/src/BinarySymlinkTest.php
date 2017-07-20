@@ -7,10 +7,10 @@ use Composer\Config;
 use Composer\IO\BaseIO;
 use Composer\IO\NullIO;
 use Composer\Package\RootPackage;
+use Composer\Script\Event;
 use Evolaze\BinarySymlink\ScriptHandler;
 use PHPUnit_Framework_TestCase;
 use RuntimeException;
-use Composer\Script\CommandEvent;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 
@@ -18,11 +18,12 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
 {
     protected const FROM_DIR = 'tests' . DIRECTORY_SEPARATOR . 'from';
     protected const TO_DIR = 'tests' . DIRECTORY_SEPARATOR . 'to';
-    protected const BIN = 'bin.sh';
-    protected const FILEMODE_BIN = 'filemode-bin.sh';
-    protected const OTHER_BIN = 'other-bin.sh';
-    protected const OTHER_SUBDIR_BIN = 'subdir' . DIRECTORY_SEPARATOR . 'subdir-other-bin.sh';
-    protected const SUBDIR_BIN = 'subdir' . DIRECTORY_SEPARATOR . 'subdir-bin.sh';
+    protected const BIN_1 = '1.sh';
+    protected const BIN_2 = '2.sh';
+    protected const SUBDIR0_BIN_3 = 'subdir0' . DIRECTORY_SEPARATOR . '3.sh';
+    protected const SUBDIR0_BIN_4 = 'subdir0' . DIRECTORY_SEPARATOR . '4.sh';
+    protected const SUBDIR1_BIN_5 = 'subdir0' . DIRECTORY_SEPARATOR . '5.sh';
+    protected const SUBDIR1_BIN_6 = 'subdir0' . DIRECTORY_SEPARATOR . '6.sh';
     protected const FILEMODE = '0644';
 
     /** @var Composer */
@@ -37,36 +38,9 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     /** @var RootPackage */
     protected $package;
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function setUp()
-    {
-        $this->io = new NullIO();
-        $this->composer = new Composer();
-        $this->config = new Config();
-        $this->composer->setConfig($this->config);
-        $this->package = new RootPackage('name', 'version', 'pretty-version');
-        $this->composer->setPackage($this->package);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function tearDown()
-    {
-        (new Filesystem())->remove(Finder::create()
-            ->files()
-            ->in(self::TO_DIR));
-        (new Filesystem())->chmod(Finder::create()
-            ->files()
-            ->in(self::FROM_DIR)
-            ->name(self::FILEMODE_BIN), intval(self::FILEMODE, 8));
-    }
-
     public function testDoNothingInNotDevMode()
     {
-        $event = new CommandEvent('name', $this->composer, $this->io);
+        $event = new Event('name', $this->composer, $this->io);
         ScriptHandler::installBinary($event);
     }
 
@@ -79,7 +53,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     {
         $this->setExpectedException(RuntimeException::class, 'cannot find links options');
         $this->package->setExtra($this->buildExtra($selfExtra));
-        $event = new CommandEvent('name', $this->composer, $this->io, true);
+        $event = new Event('name', $this->composer, $this->io, true);
         ScriptHandler::installBinary($event);
     }
 
@@ -107,35 +81,41 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     public function testInstall(string $expectedFrom, string $expectedTo, array $selfExtra = null)
     {
         $this->package->setExtra($this->buildExtra($selfExtra));
-        $event = new CommandEvent('name', $this->composer, $this->io, true);
+        $event = new Event('name', $this->composer, $this->io, true);
         ScriptHandler::installBinary($event);
         $this->assertFileEquals($expectedFrom, $expectedTo);
     }
 
     public function dataProviderInstall()
     {
-        $selfExtra0 = self::getDefaultSelfExtra();
-        $from0 = self::BIN;
-        $selfExtra0['links'] = [
-            $from0,
-        ];
-        $from1 = self::BIN;
-        $to1 = self::OTHER_BIN;
-        $selfExtra1 = self::getDefaultSelfExtra();
-        $selfExtra1['links'] = [
-            $from1 => $to1,
-        ];
-        $selfExtra2 = self::getDefaultSelfExtra();
-        $from2 = self::OTHER_BIN;
-        $to2 = self::BIN;
-        $selfExtra2['links'][] = [
-            'from' => $from2,
-            'to' => $to2,
-        ];
+        $from0 = self::BIN_1;
+        $selfExtra0 = array_merge(self::getDefaultSelfExtra(), [
+            'links' => $from0,
+        ]);
+        $selfExtra1 = array_merge(self::getDefaultSelfExtra(), [
+            'links' => [
+                $from0,
+            ],
+        ]);
+        $to2 = self::BIN_2;
+        $selfExtra2 = array_merge(self::getDefaultSelfExtra(), [
+            'links' => [
+                $from0 => $to2,
+            ],
+        ]);
+        $from3 = self::BIN_2;
+        $to3 = self::BIN_1;
+        $selfExtra3 = array_merge(self::getDefaultSelfExtra(), [
+            'links' => [[
+                'from' => $from3,
+                'to' => $to3,
+            ]]
+        ]);
         return [
             [self::FROM_DIR . DIRECTORY_SEPARATOR . $from0, self::TO_DIR . DIRECTORY_SEPARATOR . $from0, $selfExtra0],
-            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from1, self::TO_DIR . DIRECTORY_SEPARATOR . $to1, $selfExtra1],
-            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from2, self::TO_DIR . DIRECTORY_SEPARATOR . $to2, $selfExtra2],
+            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from0, self::TO_DIR . DIRECTORY_SEPARATOR . $from0, $selfExtra1],
+            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from0, self::TO_DIR . DIRECTORY_SEPARATOR . $to2, $selfExtra2],
+            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from3, self::TO_DIR . DIRECTORY_SEPARATOR . $to3, $selfExtra3],
         ];
     }
 
@@ -148,7 +128,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     public function testScanDir(int $expected, array $selfExtra, string $to)
     {
         $this->package->setExtra($this->buildExtra($selfExtra));
-        $event = new CommandEvent('name', $this->composer, $this->io, true);
+        $event = new Event('name', $this->composer, $this->io, true);
         ScriptHandler::installBinary($event);
         $files = Finder::create()->files()
             ->in($to);
@@ -157,14 +137,18 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
 
     public function dataProviderScanDir()
     {
-        $selfExtra = array_merge(self::getDefaultSelfExtra(), [
+        $selfExtra0 = array_merge(self::getDefaultSelfExtra(), [
+            'links' => 'subdir0',
+        ]);
+        $selfExtra1 = array_merge(self::getDefaultSelfExtra(), [
             'links' => [
-                'subdir',
+                'subdir0',
             ],
         ]);
 
         return [
-            [2, $selfExtra, $selfExtra['to-dir']],
+            [2, $selfExtra0, $selfExtra0['to-dir']],
+            [2, $selfExtra1, $selfExtra0['to-dir']],
         ];
     }
 
@@ -176,14 +160,14 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      */
     public function testFilemode(string $expected, string $file, array $selfExtra) {
         $this->package->setExtra($this->buildExtra($selfExtra));
-        $event = new CommandEvent('name', $this->composer, $this->io, true);
+        $event = new Event('name', $this->composer, $this->io, true);
         ScriptHandler::installBinary($event);
         $this->assertSame(substr(sprintf('%o', fileperms($file)), -4), $expected);
     }
 
     public function dataProviderFilemode()
     {
-        $bin = self::FILEMODE_BIN;
+        $bin = self::BIN_1;
         $filemode = '0711';
         $selfExtra0 = array_merge(self::getDefaultSelfExtra(), [
             'links' => [
@@ -208,6 +192,73 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
             [$filemode, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra1],
             [$filemode, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra2],
         ];
+    }
+
+    public function testFull() {
+        $selfExtra = array_merge(self::getDefaultSelfExtra(), [
+            'filemode' => '0411',
+            'links' => [
+                'subdir0',
+                [
+                    'from' => 'subdir1',
+                    'filemode' => '0511',
+                ],
+                [
+                    'from' => self::BIN_1,
+                    'to' => self::BIN_2,
+                ],
+                [
+                    'from' => self::BIN_2,
+                    'to' => self::BIN_1,
+                    'filemode' => '0755',
+                ],
+            ],
+        ]);
+        $this->package->setExtra($this->buildExtra($selfExtra));
+        $event = new Event('name', $this->composer, $this->io, true);
+        ScriptHandler::installBinary($event);
+        $this->assertFileEquals('tests/from/1.sh', 'tests/to/2.sh');
+        $this->assertFileperms('tests/from/1.sh', '0411');
+        $this->assertFileEquals('tests/from/2.sh', 'tests/to/1.sh');
+        $this->assertFileperms('tests/from/2.sh', '0755');
+        $this->assertFileEquals('tests/from/subdir0/3.sh', 'tests/to/3.sh');
+        $this->assertFileperms('tests/from/subdir0/3.sh', '0411');
+        $this->assertFileEquals('tests/from/subdir0/4.sh', 'tests/to/4.sh');
+        $this->assertFileperms('tests/from/subdir0/4.sh', '0411');
+        $this->assertFileEquals('tests/from/subdir1/5.sh', 'tests/to/5.sh');
+        $this->assertFileperms('tests/from/subdir1/5.sh', '0511');
+        $this->assertFileEquals('tests/from/subdir1/6.sh', 'tests/to/6.sh');
+        $this->assertFileperms('tests/from/subdir1/6.sh', '0511');
+    }
+
+    protected function assertFileperms(string $filename, string $filemode) {
+        $this->assertSame(substr(sprintf('%o', fileperms($filename)), -4), $filemode);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function setUp()
+    {
+        $this->io = new NullIO();
+        $this->composer = new Composer();
+        $this->config = new Config();
+        $this->composer->setConfig($this->config);
+        $this->package = new RootPackage('name', 'version', 'pretty-version');
+        $this->composer->setPackage($this->package);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function tearDown()
+    {
+        (new Filesystem())->remove(Finder::create()
+            ->files()
+            ->in(self::TO_DIR));
+        (new Filesystem())->chmod(Finder::create()
+            ->files()
+            ->in(self::FROM_DIR), intval(self::FILEMODE, 8));
     }
 
     protected static function getDefaultSelfExtra() {
