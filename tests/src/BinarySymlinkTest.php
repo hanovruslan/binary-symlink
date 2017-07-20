@@ -16,6 +16,15 @@ use Symfony\Component\Finder\Finder;
 
 class BinarySymlinkTest extends PHPUnit_Framework_TestCase
 {
+    protected const FROM_DIR = 'tests' . DIRECTORY_SEPARATOR . 'from';
+    protected const TO_DIR = 'tests' . DIRECTORY_SEPARATOR . 'to';
+    protected const BIN = 'bin.sh';
+    protected const FILEMODE_BIN = 'filemode-bin.sh';
+    protected const OTHER_BIN = 'other-bin.sh';
+    protected const OTHER_SUBDIR_BIN = 'subdir' . DIRECTORY_SEPARATOR . 'subdir-other-bin.sh';
+    protected const SUBDIR_BIN = 'subdir' . DIRECTORY_SEPARATOR . 'subdir-bin.sh';
+    protected const FILEMODE = '0644';
+
     /** @var Composer */
     protected $composer;
 
@@ -27,19 +36,6 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
 
     /** @var RootPackage */
     protected $package;
-
-    protected const BIN = 'bin';
-    protected const OTHER_BIN = 'other-bin';
-    protected const SUBDIR_BIN = 'subdir-bin';
-    protected const OTHER_SUBDIR_BIN = 'other-subdir-bin';
-    protected const BINS = [
-        self::BIN => 'bin.sh',
-        self::OTHER_BIN => 'other-bin.sh',
-        self::SUBDIR_BIN => 'subdir' . DIRECTORY_SEPARATOR . 'subdir-bin.sh',
-        self::OTHER_SUBDIR_BIN => 'subdir' . DIRECTORY_SEPARATOR . 'subdir-other-bin.sh',
-    ];
-    protected const FROM_DIR = 'tests' . DIRECTORY_SEPARATOR . 'from';
-    protected const TO_DIR = 'tests' . DIRECTORY_SEPARATOR . 'to';
 
     /**
      * {@inheritdoc}
@@ -62,6 +58,10 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
         (new Filesystem())->remove(Finder::create()
             ->files()
             ->in(self::TO_DIR));
+        (new Filesystem())->chmod(Finder::create()
+            ->files()
+            ->in(self::FROM_DIR)
+            ->name(self::FILEMODE_BIN), intval(self::FILEMODE, 8));
     }
 
     public function testDoNothingInNotDevMode()
@@ -114,24 +114,20 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
 
     public function dataProviderInstall()
     {
-        $selfExtra = [
-            'from-dir' => self::FROM_DIR,
-            'to-dir' => self::TO_DIR,
-        ];
-        $selfExtra0 = $selfExtra;
-        $from0 = self::BINS[self::BIN];
+        $selfExtra0 = self::getDefaultSelfExtra();
+        $from0 = self::BIN;
         $selfExtra0['links'] = [
             $from0,
         ];
-        $from1 = self::BINS[self::BIN];
-        $to1 = self::BINS[self::OTHER_BIN];
-        $selfExtra1 = $selfExtra;
+        $from1 = self::BIN;
+        $to1 = self::OTHER_BIN;
+        $selfExtra1 = self::getDefaultSelfExtra();
         $selfExtra1['links'] = [
             $from1 => $to1,
         ];
-        $selfExtra2 = $selfExtra;
-        $from2 = self::BINS[self::OTHER_BIN];
-        $to2 = self::BINS[self::BIN];
+        $selfExtra2 = self::getDefaultSelfExtra();
+        $from2 = self::OTHER_BIN;
+        $to2 = self::BIN;
         $selfExtra2['links'][] = [
             'from' => $from2,
             'to' => $to2,
@@ -161,16 +157,63 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
 
     public function dataProviderScanDir()
     {
-        $selfExtra = [
-            'from-dir' => self::FROM_DIR,
-            'to-dir' => self::TO_DIR,
+        $selfExtra = array_merge(self::getDefaultSelfExtra(), [
             'links' => [
                 'subdir',
             ],
-        ];
+        ]);
 
         return [
             [2, $selfExtra, $selfExtra['to-dir']],
+        ];
+    }
+
+    /**
+     * @param string $expected
+     * @param string $file
+     * @param array $selfExtra
+     * @dataProvider dataProviderFilemode
+     */
+    public function testFilemode(string $expected, string $file, array $selfExtra) {
+        $this->package->setExtra($this->buildExtra($selfExtra));
+        $event = new CommandEvent('name', $this->composer, $this->io, true);
+        ScriptHandler::installBinary($event);
+        $this->assertSame(substr(sprintf('%o', fileperms($file)), -4), $expected);
+    }
+
+    public function dataProviderFilemode()
+    {
+        $bin = self::FILEMODE_BIN;
+        $filemode = '0711';
+        $selfExtra0 = array_merge(self::getDefaultSelfExtra(), [
+            'links' => [
+                $bin,
+            ],
+        ]);
+        $selfExtra1 = array_merge($selfExtra0, [
+            'filemode' => $filemode,
+        ]);
+        $selfExtra2 = array_merge(self::getDefaultSelfExtra(), [
+            'links' => [
+                [
+                    'from' => $bin,
+                    'to' => $bin,
+                    'filemode' => $filemode,
+                ],
+            ],
+        ]);
+
+        return [
+            [self::FILEMODE, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra0],
+            [$filemode, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra1],
+            [$filemode, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra2],
+        ];
+    }
+
+    protected static function getDefaultSelfExtra() {
+        return [
+            'from-dir' => self::FROM_DIR,
+            'to-dir' => self::TO_DIR,
         ];
     }
 
