@@ -28,6 +28,19 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     /** @var RootPackage */
     protected $package;
 
+    protected const BIN = 'bin';
+    protected const OTHER_BIN = 'other-bin';
+    protected const SUBDIR_BIN = 'subdir-bin';
+    protected const OTHER_SUBDIR_BIN = 'other-subdir-bin';
+    protected const BINS = [
+        self::BIN => 'bin.sh',
+        self::OTHER_BIN => 'other-bin.sh',
+        self::SUBDIR_BIN => 'subdir' . DIRECTORY_SEPARATOR . 'subdir-bin.sh',
+        self::OTHER_SUBDIR_BIN => 'subdir' . DIRECTORY_SEPARATOR . 'subdir-other-bin.sh',
+    ];
+    protected const FROM_DIR = 'tests' . DIRECTORY_SEPARATOR . 'from';
+    protected const TO_DIR = 'tests' . DIRECTORY_SEPARATOR . 'to';
+
     /**
      * {@inheritdoc}
      */
@@ -48,7 +61,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     {
         (new Filesystem())->remove(Finder::create()
             ->files()
-            ->in('tests/to'));
+            ->in(self::TO_DIR));
     }
 
     public function testDoNothingInNotDevMode()
@@ -58,19 +71,19 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     }
 
     /**
-     * @param array $selfExtra
+     * @param array|null $selfExtra
      *
-     * @dataProvider dataFailedOnMissedExtra
+     * @dataProvider dataProviderFailedOnMissedExtra
      */
     public function testFailedOnMissedExtra(array $selfExtra = null)
     {
-        $this->setExpectedException(RuntimeException::class, 'cannot find binary symlinks');
+        $this->setExpectedException(RuntimeException::class, 'cannot find links options');
         $this->package->setExtra($this->buildExtra($selfExtra));
         $event = new CommandEvent('name', $this->composer, $this->io, true);
         ScriptHandler::installBinary($event);
     }
 
-    public function dataFailedOnMissedExtra()
+    public function dataProviderFailedOnMissedExtra()
     {
         $selfExtra0 = null;
         $selfExtra1 = [];
@@ -86,48 +99,47 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     }
 
     /**
-     * @param string $expected
+     * @param string $expectedFrom
+     * @param string $expectedTo
      * @param array|null $selfExtra
-     * @dataProvider dataExtra
+     * @dataProvider dataProviderInstall
      */
-    public function testInstall(string $expected, array $selfExtra = null)
+    public function testInstall(string $expectedFrom, string $expectedTo, array $selfExtra = null)
     {
         $this->package->setExtra($this->buildExtra($selfExtra));
         $event = new CommandEvent('name', $this->composer, $this->io, true);
         ScriptHandler::installBinary($event);
-        $this->assertFileExists($expected);
+        $this->assertFileEquals($expectedFrom, $expectedTo);
     }
 
-    public function dataExtra()
+    public function dataProviderInstall()
     {
-        $to = 'tests/to';
         $selfExtra = [
-            'from-dir' => 'tests/from',
-            'to-dir' => $to,
-            'links' => [],
+            'from-dir' => self::FROM_DIR,
+            'to-dir' => self::TO_DIR,
         ];
-        $expected0 = 'bin.sh';
-        $expected1 = 'foo.sh';
-        $expected2 = 'sdb.sh';
         $selfExtra0 = $selfExtra;
-        $selfExtra0['links'][] = [
-            'from' => $expected0,
+        $from0 = self::BINS[self::BIN];
+        $selfExtra0['links'] = [
+            $from0,
         ];
+        $from1 = self::BINS[self::BIN];
+        $to1 = self::BINS[self::OTHER_BIN];
         $selfExtra1 = $selfExtra;
-        $selfExtra1['links'][] = [
-            'from' => 'bin.sh',
-            'to' => $expected1,
+        $selfExtra1['links'] = [
+            $from1 => $to1,
         ];
         $selfExtra2 = $selfExtra;
+        $from2 = self::BINS[self::OTHER_BIN];
+        $to2 = self::BINS[self::BIN];
         $selfExtra2['links'][] = [
-            'from' => 'subdir/subdir-bin.sh',
-            'to' => $expected2,
+            'from' => $from2,
+            'to' => $to2,
         ];
-
         return [
-            [$to . DIRECTORY_SEPARATOR . $expected0, $selfExtra0],
-            [$to . DIRECTORY_SEPARATOR . $expected1, $selfExtra1],
-            [$to . DIRECTORY_SEPARATOR . $expected2, $selfExtra2],
+            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from0, self::TO_DIR . DIRECTORY_SEPARATOR . $from0, $selfExtra0],
+            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from1, self::TO_DIR . DIRECTORY_SEPARATOR . $to1, $selfExtra1],
+            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from2, self::TO_DIR . DIRECTORY_SEPARATOR . $to2, $selfExtra2],
         ];
     }
 
@@ -135,7 +147,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param int $expected
      * @param array $selfExtra
      * @param string $to
-     * @dataProvider dataScanDir
+     * @dataProvider dataProviderScanDir
      */
     public function testScanDir(int $expected, array $selfExtra, string $to)
     {
@@ -147,11 +159,11 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
         $this->assertEquals($expected, $files->count());
     }
 
-    public function dataScanDir()
+    public function dataProviderScanDir()
     {
         $selfExtra = [
-            'from-dir' => 'tests/from',
-            'to-dir' => 'tests/to',
+            'from-dir' => self::FROM_DIR,
+            'to-dir' => self::TO_DIR,
             'links' => [
                 'subdir',
             ],
@@ -172,7 +184,9 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     protected function buildExtra(array $selfExtra = null)
     {
         return [
-            'symfony-assets-install' => 'relative',
+            'symfony-app-dir' => 'app',
+            'symfony-web-dir' => 'web',
+            'symfony-assets-install' => 'hard',
             'symfony-cache-warmup' => false,
             'evolaze-binary-symlink' => $selfExtra,
         ];
