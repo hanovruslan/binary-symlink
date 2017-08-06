@@ -16,15 +16,17 @@ use Symfony\Component\Finder\Finder;
 
 class BinarySymlinkTest extends PHPUnit_Framework_TestCase
 {
-    protected const FROM_DIR = 'tests' . DIRECTORY_SEPARATOR . 'from';
-    protected const TO_DIR = 'tests' . DIRECTORY_SEPARATOR . 'to';
+    protected const TESTS_DIR = 'tests';
+    protected const FROM_DIR = self::TESTS_DIR . DIRECTORY_SEPARATOR . 'from';
+    protected const TO_DIR = self::TESTS_DIR . DIRECTORY_SEPARATOR . 'to';
     protected const BIN_1 = '1.sh';
     protected const BIN_2 = '2.sh';
-    protected const SUBDIR0_BIN_3 = 'subdir0' . DIRECTORY_SEPARATOR . '3.sh';
-    protected const SUBDIR0_BIN_4 = 'subdir0' . DIRECTORY_SEPARATOR . '4.sh';
-    protected const SUBDIR1_BIN_5 = 'subdir0' . DIRECTORY_SEPARATOR . '5.sh';
-    protected const SUBDIR1_BIN_6 = 'subdir0' . DIRECTORY_SEPARATOR . '6.sh';
-    protected const FILEMODE = '0644';
+    protected const SUBDIR_0 = 'subdir0';
+    protected const SUBDIR0_BIN_3 = self::SUBDIR_0 . DIRECTORY_SEPARATOR . '3.sh';
+    protected const SUBDIR0_BIN_4 = self::SUBDIR_0 . DIRECTORY_SEPARATOR . '4.sh';
+    protected const SUBDIR1_BIN_5 = self::SUBDIR_0 . DIRECTORY_SEPARATOR . '5.sh';
+    protected const SUBDIR1_BIN_6 = self::SUBDIR_0 . DIRECTORY_SEPARATOR . '6.sh';
+    protected const DEFAULT_FILEMODE = '0644';
 
     /** @var Composer */
     protected $composer;
@@ -77,6 +79,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param string $expectedTo
      * @param array|null $selfExtra
      * @dataProvider dataProviderInstall
+     * @group smoke
      */
     public function testInstall(string $expectedFrom, string $expectedTo, array $selfExtra = null)
     {
@@ -120,10 +123,42 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     }
 
     /**
+     * @param string $expectedFrom
+     * @param string $expectedTo
+     * @param array $selfExtra
+     *
+     * @group smoke
+     * @dataProvider dataProviderUseRoot
+     */
+    public function testUseRoot(string $expectedFrom, string $expectedTo, array $selfExtra)
+    {
+        $this->package->setExtra($this->buildExtra($selfExtra));
+        $event = new Event('name', $this->composer, $this->io, true);
+        ScriptHandler::installBinary($event);
+        $this->assertFileEquals($expectedFrom, $expectedTo);
+    }
+
+    public function dataProviderUseRoot()
+    {
+        $from0 = self::FROM_DIR . DIRECTORY_SEPARATOR . self::BIN_1;
+        $to0 = self::TO_DIR . DIRECTORY_SEPARATOR . self::BIN_1;
+        $selfExtra0 = [
+            'to-dir' => self::TO_DIR,
+            'use-root' => true,
+            'links' => $from0,
+        ];
+
+        return [
+            [$from0, $to0, $selfExtra0],
+        ];
+    }
+
+    /**
      * @param int $expected
      * @param array $selfExtra
      * @param string $to
      * @dataProvider dataProviderScanDir
+     * @group smoke
      */
     public function testScanDir(int $expected, array $selfExtra, string $to)
     {
@@ -138,11 +173,11 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     public function dataProviderScanDir()
     {
         $selfExtra0 = array_merge(self::getDefaultSelfExtra(), [
-            'links' => 'subdir0',
+            'links' => self::SUBDIR_0,
         ]);
         $selfExtra1 = array_merge(self::getDefaultSelfExtra(), [
             'links' => [
-                'subdir0',
+                self::SUBDIR_0,
             ],
         ]);
 
@@ -157,6 +192,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param string $file
      * @param array $selfExtra
      * @dataProvider dataProviderFilemode
+     * @group smoke
      */
     public function testFilemode(string $expected, string $file, array $selfExtra) {
         $this->package->setExtra($this->buildExtra($selfExtra));
@@ -188,20 +224,27 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
         ]);
 
         return [
-            [self::FILEMODE, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra0],
+            [self::DEFAULT_FILEMODE, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra0],
             [$filemode, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra1],
             [$filemode, self::FROM_DIR . DIRECTORY_SEPARATOR . $bin, $selfExtra2],
         ];
     }
 
+    /**
+     * @group smoke
+     * @group full
+     */
     public function testFull() {
+        $filemode0 = '0411';
+        $filemode1 = '0511';
+        $filemode2 = '0755';
         $selfExtra = array_merge(self::getDefaultSelfExtra(), [
-            'filemode' => '0411',
+            'filemode' => $filemode0,
             'links' => [
-                'subdir0',
+                self::SUBDIR_0,
                 [
                     'from' => 'subdir1',
-                    'filemode' => '0511',
+                    'filemode' => $filemode1,
                 ],
                 [
                     'from' => self::BIN_1,
@@ -210,25 +253,25 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
                 [
                     'from' => self::BIN_2,
                     'to' => self::BIN_1,
-                    'filemode' => '0755',
+                    'filemode' => $filemode2,
                 ],
             ],
         ]);
         $this->package->setExtra($this->buildExtra($selfExtra));
         $event = new Event('name', $this->composer, $this->io, true);
         ScriptHandler::installBinary($event);
-        $this->assertFileEquals('tests/from/1.sh', 'tests/to/2.sh');
-        $this->assertFileperms('tests/from/1.sh', '0411');
-        $this->assertFileEquals('tests/from/2.sh', 'tests/to/1.sh');
-        $this->assertFileperms('tests/from/2.sh', '0755');
-        $this->assertFileEquals('tests/from/subdir0/3.sh', 'tests/to/3.sh');
-        $this->assertFileperms('tests/from/subdir0/3.sh', '0411');
-        $this->assertFileEquals('tests/from/subdir0/4.sh', 'tests/to/4.sh');
-        $this->assertFileperms('tests/from/subdir0/4.sh', '0411');
-        $this->assertFileEquals('tests/from/subdir1/5.sh', 'tests/to/5.sh');
-        $this->assertFileperms('tests/from/subdir1/5.sh', '0511');
-        $this->assertFileEquals('tests/from/subdir1/6.sh', 'tests/to/6.sh');
-        $this->assertFileperms('tests/from/subdir1/6.sh', '0511');
+        $this->assertFileEquals(self::FROM_DIR . DIRECTORY_SEPARATOR . '1.sh', self::TO_DIR . DIRECTORY_SEPARATOR . '2.sh');
+        $this->assertFileperms(self::FROM_DIR . DIRECTORY_SEPARATOR . '1.sh', $filemode1);
+        $this->assertFileEquals(self::FROM_DIR . DIRECTORY_SEPARATOR . '2.sh', self::TO_DIR . DIRECTORY_SEPARATOR . '1.sh');
+        $this->assertFileperms(self::FROM_DIR . DIRECTORY_SEPARATOR . '2.sh', $filemode2);
+        $this->assertFileEquals(self::FROM_DIR . DIRECTORY_SEPARATOR . self::SUBDIR_0 . DIRECTORY_SEPARATOR . '3.sh', self::TO_DIR . DIRECTORY_SEPARATOR . '3.sh');
+        $this->assertFileperms(self::FROM_DIR . DIRECTORY_SEPARATOR . self::SUBDIR_0 . DIRECTORY_SEPARATOR . '3.sh', $filemode0);
+        $this->assertFileEquals(self::FROM_DIR . DIRECTORY_SEPARATOR . self::SUBDIR_0 . DIRECTORY_SEPARATOR . '4.sh', self::TO_DIR . DIRECTORY_SEPARATOR . '4.sh');
+        $this->assertFileperms(self::FROM_DIR . DIRECTORY_SEPARATOR . self::SUBDIR_0 . DIRECTORY_SEPARATOR . '4.sh', $filemode0);
+        $this->assertFileEquals(self::FROM_DIR . DIRECTORY_SEPARATOR . 'subdir1' . DIRECTORY_SEPARATOR . '5.sh', self::TO_DIR . DIRECTORY_SEPARATOR . '5.sh');
+        $this->assertFileperms(self::FROM_DIR . DIRECTORY_SEPARATOR . 'subdir1' . DIRECTORY_SEPARATOR . '5.sh', $filemode1);
+        $this->assertFileEquals(self::FROM_DIR . DIRECTORY_SEPARATOR . 'subdir1' . DIRECTORY_SEPARATOR . '6.sh', self::TO_DIR . DIRECTORY_SEPARATOR . '6.sh');
+        $this->assertFileperms(self::FROM_DIR . DIRECTORY_SEPARATOR . 'subdir1' . DIRECTORY_SEPARATOR . '6.sh', $filemode1);
     }
 
     protected function assertFileperms(string $filename, string $filemode) {
@@ -258,7 +301,7 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
             ->in(self::TO_DIR));
         (new Filesystem())->chmod(Finder::create()
             ->files()
-            ->in(self::FROM_DIR), intval(self::FILEMODE, 8));
+            ->in(self::FROM_DIR), intval(self::DEFAULT_FILEMODE, 8));
     }
 
     protected static function getDefaultSelfExtra() {

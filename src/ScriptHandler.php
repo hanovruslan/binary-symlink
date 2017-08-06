@@ -17,10 +17,11 @@ class ScriptHandler extends BaseScriptHandler
     protected const NAME_TO = 'to';
     protected const NAME_LINKS = 'links';
     protected const NAME_FILEMODE = 'filemode';
+    protected const NAME_USE_ROOT_AS_FROM_DIR = 'use-root';
     protected const DEFAULTS = [
         self::NAME_FROM_DIR => 'app',
         self::NAME_TO_DIR => 'bin',
-        self::NAME_FILEMODE => null,
+        self::NAME_FILEMODE => '0644',
     ];
 
     /** @var Filesystem */
@@ -50,10 +51,11 @@ class ScriptHandler extends BaseScriptHandler
      */
     protected static function processOptions(array $options)
     {
+
         foreach ($options[self::NAME_LINKS] as $link) {
             if (null !== $link[self::NAME_FILEMODE]) {
                 self::getFilesystem()->chmod(
-                    realpath(getcwd() . DIRECTORY_SEPARATOR . dirname($link[self::NAME_TO]) . DIRECTORY_SEPARATOR . $link[self::NAME_FROM]),
+                    realpath(dirname($link[self::NAME_TO]) . DIRECTORY_SEPARATOR . $link[self::NAME_FROM]),
                     intval($link[self::NAME_FILEMODE], 8)
                 );
             }
@@ -112,14 +114,16 @@ class ScriptHandler extends BaseScriptHandler
     {
         $result = [];
         if (isset($options[self::NAME_SELF]) && is_array($options[self::NAME_SELF])) {
+            $result[self::NAME_USE_ROOT_AS_FROM_DIR] = self::extractOption($options[self::NAME_SELF], self::NAME_USE_ROOT_AS_FROM_DIR);
             $result[self::NAME_FROM_DIR] = self::extractOption($options[self::NAME_SELF], self::NAME_FROM_DIR);
-            $result[self::NAME_TO_DIR] = self::extractOption($options[self::NAME_SELF], self::NAME_TO_DIR);
+            $result[self::NAME_TO_DIR] = self::buildRealpath(self::extractOption($options[self::NAME_SELF], self::NAME_TO_DIR), $result[self::NAME_USE_ROOT_AS_FROM_DIR]);
             $result[self::NAME_FILEMODE] = self::extractOption($options[self::NAME_SELF], self::NAME_FILEMODE);
             $result[self::NAME_LINKS] = self::extractLinks(
                 $options[self::NAME_SELF],
                 $result[self::NAME_TO_DIR],
                 $result[self::NAME_FROM_DIR],
-                $result[self::NAME_FILEMODE]
+                $result[self::NAME_FILEMODE],
+                $result[self::NAME_USE_ROOT_AS_FROM_DIR]
             );
         }
 
@@ -143,49 +147,62 @@ class ScriptHandler extends BaseScriptHandler
      * @param string $toDir
      * @param string $fromDir
      * @param string|null $filemode
+     * @param string|null $useRoot
      *
      * @return array|null
      */
-    protected static function extractLinks(array $options, string $toDir, string $fromDir, string $filemode = null)
-    {
+    protected static function extractLinks(
+        array $options,
+        string $toDir,
+        string $fromDir,
+        string $filemode = null,
+        string $useRoot = null
+    ) {
         $result = null;
         if (isset($options[self::NAME_LINKS])) {
             $options[self::NAME_LINKS] = is_array($options[self::NAME_LINKS])
                 ? $options[self::NAME_LINKS]
                 : [$options[self::NAME_LINKS]];
-            $result = self::resolveLinks($options[self::NAME_LINKS], $toDir, $fromDir, $filemode);
+            $result = self::resolveLinks($options[self::NAME_LINKS], $toDir, $fromDir, $filemode, $useRoot);
         }
 
         return $result;
     }
 
     /**
-     * @param array $links
+     * @param array $rawLinks
      * @param string $toDir
      * @param string $fromDir
      * @param string|null $filemode
+     * @param string|null $useRoot
      *
      * @return array
      */
-    protected static function resolveLinks(array $links, string $toDir, string $fromDir, string $filemode = null)
-    {
+    protected static function resolveLinks(
+        array $rawLinks,
+        string $toDir,
+        string $fromDir,
+        string $filemode = null,
+        string $useRoot = null
+    ) {
         $result = [];
-        $filesystem = self::getFilesystem();
-        foreach ($links as $rawFrom => $rawTo) {
+        foreach ($rawLinks as $rawFrom => $rawTo) {
             $rawLink = is_array($rawTo) ? $rawTo : [
                 self::NAME_FROM => !is_int($rawFrom) ? $rawFrom : $rawTo,
-                self::NAME_TO => $rawTo,
+                self::NAME_TO => basename($rawTo),
             ];
-            foreach (self::resolveLinkFrom($rawLink, $fromDir) as $from) {
+            foreach (self::resolveLinkFromAndTo($rawLink, $fromDir, $toDir, $useRoot) as $from => $to) {
                 $link = $rawLink;
                 $link[self::NAME_FROM] = $from;
-                $to = self::resolveLinkTo($link, $toDir, $fromDir);
-                $from = $filesystem->makePathRelative($fromDir, dirname($to)) . $from;
-                $result[] = [
-                    self::NAME_FROM => $from,
+
+                $link =  [
+                    self::NAME_FROM => self::buildRelative($from, $to),
                     self::NAME_TO => $to,
-                    self::NAME_FILEMODE => isset($rawTo[self::NAME_FILEMODE]) ? $rawTo[self::NAME_FILEMODE] : $filemode,
                 ];
+                if ($filemode = isset($rawTo[self::NAME_FILEMODE]) ? $rawTo[self::NAME_FILEMODE] : $filemode) {
+                    $link[self::NAME_FILEMODE] = $filemode;
+                }
+                $result[] = $link;
             }
         }
 
@@ -193,40 +210,52 @@ class ScriptHandler extends BaseScriptHandler
     }
 
     /**
-     * @param array $link
-     * @param string $toDir
-     * @param string $fromDir
-     *
+     * @param string $from
+     * @param string $to
      * @return string
      */
-    protected static function resolveLinkTo(array $link, string $toDir, string $fromDir)
+    protected static function buildRelative(string $from, string $to)
     {
-        $to = $toDir . DIRECTORY_SEPARATOR;
-        $to .= isset($link[self::NAME_TO]) && !is_dir($fromDir . DIRECTORY_SEPARATOR . $link[self::NAME_TO])
-            ? $link[self::NAME_TO]
-            : basename($link[self::NAME_FROM]);
-
-        return $to;
+        return self::getFilesystem()->makePathRelative(dirname($from), dirname($to)) . basename($from);
     }
 
     /**
      * @param array $link
      * @param string $fromDir
+     * @param string $toDir
+     * @param string|null $useRoot
      *
      * @return array
      */
-    protected static function resolveLinkFrom(array $link, string $fromDir)
+    protected static function resolveLinkFromAndTo(array $link, string $fromDir, string $toDir, string $useRoot = null)
     {
+        $fromDir = $useRoot ? self::buildRealpath(DIRECTORY_SEPARATOR, $useRoot) : $fromDir;
+        $result = [];
         if (is_dir($fromDir . DIRECTORY_SEPARATOR . $link[self::NAME_FROM])) {
-            $from = self::scanSubdir($fromDir, $link[self::NAME_FROM]);
+            foreach (self::scanSubdir($fromDir, $link[self::NAME_FROM]) as $from) {
+                $result = array_merge_recursive($result, [
+                    $fromDir . DIRECTORY_SEPARATOR . $from => $toDir . DIRECTORY_SEPARATOR . basename($from)
+                ]);
+            }
         } else {
-            $from = [
-                $link[self::NAME_FROM]
-            ];
+            $result = array_merge_recursive($result, [
+                $fromDir . DIRECTORY_SEPARATOR . $link[self::NAME_FROM] => $toDir . DIRECTORY_SEPARATOR . $link[self::NAME_TO]
+            ]);
         }
 
-        return $from;
+        return $result;
     }
+
+    /**
+     * @param string $relativePath
+     * @param string|null $useRoot
+     * @return string
+     */
+    protected static function buildRealpath(string $relativePath, string $useRoot = null)
+    {
+        return rtrim($useRoot ? getcwd() . DIRECTORY_SEPARATOR . $relativePath : $relativePath, '/');
+    }
+
 
     /**
      * @param string $dir
