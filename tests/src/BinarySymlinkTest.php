@@ -79,7 +79,6 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param string $expectedTo
      * @param array|null $selfExtra
      * @dataProvider dataProviderInstall
-     * @group smoke
      */
     public function testInstall(string $expectedFrom, string $expectedTo, array $selfExtra = null)
     {
@@ -127,7 +126,6 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param string $expectedTo
      * @param array $selfExtra
      *
-     * @group smoke
      * @dataProvider dataProviderUseRoot
      */
     public function testUseRoot(string $expectedFrom, string $expectedTo, array $selfExtra)
@@ -158,7 +156,6 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param array $selfExtra
      * @param string $to
      * @dataProvider dataProviderScanDir
-     * @group smoke
      */
     public function testScanDir(int $expected, array $selfExtra, string $to)
     {
@@ -192,9 +189,9 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
      * @param string $file
      * @param array $selfExtra
      * @dataProvider dataProviderFilemode
-     * @group smoke
      */
-    public function testFilemode(string $expected, string $file, array $selfExtra) {
+    public function testFilemode(string $expected, string $file, array $selfExtra)
+    {
         $this->package->setExtra($this->buildExtra($selfExtra));
         $event = new Event('name', $this->composer, $this->io, true);
         ScriptHandler::installBinary($event);
@@ -231,10 +228,10 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
     }
 
     /**
-     * @group smoke
      * @group full
      */
-    public function testFull() {
+    public function testFull()
+    {
         $filemode0 = '0411';
         $filemode1 = '0511';
         $filemode2 = '0755';
@@ -274,8 +271,34 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
         $this->assertFileperms(self::FROM_DIR . DIRECTORY_SEPARATOR . 'subdir1' . DIRECTORY_SEPARATOR . '6.sh', $filemode1);
     }
 
-    protected function assertFileperms(string $filename, string $filemode) {
+    protected function assertFileperms(string $filename, string $filemode)
+    {
         $this->assertSame(substr(sprintf('%o', fileperms($filename)), -4), $filemode);
+    }
+
+    /**
+     * @param string $expectedFrom
+     * @param string $expectedTo
+     * @param array $selfExtra
+     * @dataProvider dataProviderAliases
+     */
+    public function testAliases(string $expectedFrom, string $expectedTo, array $selfExtra)
+    {
+        $this->package->setExtra($this->buildExtra($selfExtra));
+        $event = new Event('name', $this->composer, $this->io, true);
+        ScriptHandler::installBinary($event);
+        $this->assertFileEquals($expectedFrom, $expectedTo);
+    }
+
+    public function dataProviderAliases()
+    {
+        $from0 = self::BIN_1;
+        $selfExtra0 = array_merge(self::getDefaultSelfExtra(true), [
+            'links' => $from0,
+        ]);
+        return [
+            [self::FROM_DIR . DIRECTORY_SEPARATOR . $from0, self::TO_DIR . DIRECTORY_SEPARATOR . $from0, $selfExtra0],
+        ];
     }
 
     /**
@@ -304,10 +327,11 @@ class BinarySymlinkTest extends PHPUnit_Framework_TestCase
             ->in(self::FROM_DIR), intval(self::DEFAULT_FILEMODE, 8));
     }
 
-    protected static function getDefaultSelfExtra() {
+    protected static function getDefaultSelfExtra($useAliases = false)
+    {
         return [
-            'from-dir' => self::FROM_DIR,
-            'to-dir' => self::TO_DIR,
+            $useAliases ? 'from' : 'from-dir' => self::FROM_DIR,
+            $useAliases ? 'to' : 'to-dir' => self::TO_DIR,
         ];
     }
 
