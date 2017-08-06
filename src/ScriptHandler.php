@@ -12,7 +12,9 @@ class ScriptHandler extends BaseScriptHandler
 {
     protected const NAME_SELF = 'evolaze-binary-symlink';
     protected const NAME_FROM_DIR = 'from-dir';
+    protected const NAME_FROM_DIR_ALIAS = 'from';
     protected const NAME_TO_DIR = 'to-dir';
+    protected const NAME_TO_DIR_ALIAS = 'to';
     protected const NAME_FROM = 'from';
     protected const NAME_TO = 'to';
     protected const NAME_LINKS = 'links';
@@ -115,8 +117,8 @@ class ScriptHandler extends BaseScriptHandler
         $result = [];
         if (isset($options[self::NAME_SELF]) && is_array($options[self::NAME_SELF])) {
             $result[self::NAME_USE_ROOT_AS_FROM_DIR] = self::extractOption($options[self::NAME_SELF], self::NAME_USE_ROOT_AS_FROM_DIR);
-            $result[self::NAME_FROM_DIR] = self::extractOption($options[self::NAME_SELF], self::NAME_FROM_DIR);
-            $result[self::NAME_TO_DIR] = self::buildRealpath(self::extractOption($options[self::NAME_SELF], self::NAME_TO_DIR), $result[self::NAME_USE_ROOT_AS_FROM_DIR]);
+            $result[self::NAME_FROM_DIR] = self::extractFromDirOption($options[self::NAME_SELF]);
+            $result[self::NAME_TO_DIR] = self::buildRealpath(self::extractToDirOption($options[self::NAME_SELF]), $result[self::NAME_USE_ROOT_AS_FROM_DIR]);
             $result[self::NAME_FILEMODE] = self::extractOption($options[self::NAME_SELF], self::NAME_FILEMODE);
             $result[self::NAME_LINKS] = self::extractLinks(
                 $options[self::NAME_SELF],
@@ -128,6 +130,20 @@ class ScriptHandler extends BaseScriptHandler
         }
 
         return $result;
+    }
+
+    protected static function extractFromDirOption(array $options)
+    {
+        return isset($options[self::NAME_FROM_DIR])
+            ?  $options[self::NAME_FROM_DIR]
+            : (isset($options[self::NAME_FROM_DIR_ALIAS]) ? $options[self::NAME_FROM_DIR_ALIAS] : self::DEFAULTS[self::NAME_FROM_DIR]);
+    }
+
+    protected static function extractToDirOption(array $options)
+    {
+        return isset($options[self::NAME_TO_DIR])
+            ?  $options[self::NAME_TO_DIR]
+            : (isset($options[self::NAME_TO_DIR_ALIAS]) ? $options[self::NAME_TO_DIR_ALIAS] : self::DEFAULTS[self::NAME_TO_DIR]);
     }
 
     /**
