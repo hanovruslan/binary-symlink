@@ -24,12 +24,29 @@
     },
     "require-dev": {
         "composer/composer": "^1.1.0",
-        "phpunit/phpunit": "~5.2.1"
+        "phpunit/phpunit": "^5.2.1"
     },
     "scripts": {
-        "test": "/app/app/phpunit.sh"
+        "install-binary": "Evolaze\\BinarySymlink\\ScriptHandler::installBinary",
+        "test": "${COMPOSER_DIR}/bin/_phpunit"
     },
     "config": {
         "bin-dir": "bin"
+    },
+    "extra": {
+        "symfony-assets-install": "symlink",
+        "symfony-cache-warmup": false,
+        "evolaze-binary-symlink": {
+            "use-root": true,
+            "to-dir": "symlinks",
+            "links": {
+                "phpunit": {
+                    "from": "app/phpunit-wrapper.sh",
+                    "to": "_phpunit",
+                    "filemode": "0755"
+                },
+                "tests/phpunit.xml": "phpunit-config.xml"
+            }
+        }
     }
 }
